@@ -1,0 +1,80 @@
+﻿<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+	<meta charset="utf-8" />
+	<title></title>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script src="wheel-tools.js" type="text/javascript"></script>
+	<script src="wheel-100.js" type="text/javascript"></script>
+	<script src="wheel-44.js" type="text/javascript"></script>
+
+	<style>
+		@page {
+			size: A4 portrait;
+		}
+		@media(print) {
+			svg {
+				width: 100%;
+			}
+		}
+
+		path[data-description]:hover, path[data-description]:hover ~ text, path[data-description] ~ text:hover {
+			cursor: pointer;
+			text-decoration: underline;
+		}
+
+		@keyframes spin {
+    		from {
+				transform: rotate(0deg);
+			}
+			to {
+				transform: rotate(360deg);
+			}
+		}
+
+		.rotate {
+			animation: spin 2s normal forwards ease-in-out;
+		}
+	
+	</style>
+</head>
+
+
+<body>
+	<div class="slidecontainer">
+		<input type="range" min="0" max="360" value="0" class="slider" id="myRange">
+	</div>
+
+	<div style="display: flex;">
+	<div id="wheel1" style="height: 800px;"></div>
+	<div id="wheel1-info" style="border: 1px solid black;">Klik een partje</div>
+	</div>
+	<div id="wheel2" style="height: 800px;"></div>
+</body>
+<script>
+
+	$(document).ready(function () {
+		Wheel100.draw('wheel2');
+		Wheel44.draw('wheel1');
+
+		$('#wheel1').addClass('rotate');
+
+		$('#myRange').on('input', function() {
+			$('#wheel1').removeClass('rotate');
+			$('#wheel1').css('transform', 'rotate(' + $('#myRange').val() + 'deg)')
+		});
+
+		$('g').on('click', function(){
+			var description = $(this).children('path[data-description]').data('description');
+			var text = $(this).children('text').text();
+
+			if(description !== typeof undefined)
+			{
+				$('#wheel1-info').html('<h1>' + text + '</h1><p>' + description + '</p>')
+			}
+		});
+	});
+</script>
+
+</html>

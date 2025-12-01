@@ -1,0 +1,99 @@
+@font-face {
+  font-family: 'JetBrains Mono';
+  src:  url('./webfonts/JetBrainsMono-Regular.woff2') format('woff2');
+}
+
+:root {
+  --dark-bg: #111118;
+  --generator-bg: #333338;
+  --light-text: #eeeee8;
+  --button-bg: #88c;
+  --none: #44c;
+  --valid: #4c4;
+  --invalid: #c44;
+  --font: 'JetBrains Mono', "Courier New", monospace;
+}
+
+* {
+  font-family: var(--font);
+}
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding: 1em;
+  background-color: var(--dark-bg);
+  color: var(--light-text);
+}
+h1 {
+  font-weight: bold;
+}
+
+.generators {
+  display: flex;
+  flex-wrap: wrap;
+  place-items: flex-start;
+}
+
+.generator {
+  width: 320px;
+  background-color: var(--generator-bg);
+  padding: 1em;
+  margin-bottom: 2em;
+  margin-right: 2em;
+  border-radius: 10px;
+}
+@media only screen and (max-width: 600px) {
+  .generator, ins {
+    width: 100%;
+  }
+}
+.generator h2 {
+  margin-top: 0;
+}
+.generator .row  {
+  display: flex;
+  justify-content: space-between;
+  padding-bottom: 1em;
+}
+input, button {
+  padding: 0.5em 0.75em;
+  transition: all 0.1s linear;
+}
+input {
+  border: none;
+  outline: none !important;
+  width: 100%;
+  background-color: var(--dark-bg);
+  color: var(--light-text);
+}
+input.none {
+  box-shadow: var(--none) 0 0 0 0.3em;
+}
+input.invalid {
+  box-shadow: var(--invalid) 0 0 0 0.3em;
+}
+input.valid {
+  box-shadow: var(--valid) 0 0 0 0.3em;
+}
+button {
+  border: none;
+  background-color: var(--button-bg);
+  font-weight: bold;
+  font-size: 1.1em;
+  border-radius: 10px;
+}
+button:hover {
+  top: 0.1em;
+  left: 0.1em;
+  background-color: var(--button-bg);
+  box-shadow: var(--button-bg) 0 0 0 0.1em;
+}
+button:active {
+  box-shadow: none;
+}
+
+.qr-code-output {
+  width: 256px;
+  height: 256px;
+}
