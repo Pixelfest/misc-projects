@@ -1,5 +1,6 @@
-﻿namespace gol.Infrastructure.Services;
+namespace gol.Infrastructure.Services;
 
+using System.Diagnostics;
 using gol.Domain.Entities;
 using gol.Domain.Services;
 
@@ -24,6 +25,7 @@ public class GameLoopService : IGameLoopService
 
     public void RunDays(List<Person> people, int numberOfDays)
     {
+        var stopwatch = Stopwatch.StartNew();
         int yearsPassed = 0;
         Random random = new Random();
 
@@ -31,81 +33,74 @@ public class GameLoopService : IGameLoopService
         {
             _currentDate = _currentDate.AddDays(1);
 
-            // Age everyone by advancing the date
             foreach (var person in people)
             {
                 person.AdvanceDay(_currentDate);
             }
 
-            // Process mortality for people at mortality start age+
-            foreach (var person in people.Where(p => p.IsAlive && p.Age >= _settings.MortalityStartAge))
+            foreach (var person in people)
             {
-                double deathProbability = CalculateDeathProbability(person.Age);
-                if (random.NextDouble() < deathProbability / 365.0) // Daily probability
+                if (person.IsAlive && person.Age >= _settings.MortalityStartAge)
                 {
-                    person.Die(_currentDate);
-                    AnnounceDeath(person);
+                    double deathProbability = CalculateDeathProbability(person.Age);
+                    if (random.NextDouble() < deathProbability / 365.0)
+                    {
+                        person.Die(_currentDate);
+                        AnnounceDeath(person);
+                    }
                 }
             }
 
-            // Match partners for those who are eligible
             _partnerMatchingService.MatchPartners(people, _currentDate);
 
-            // Generate children for eligible couples
             GenerateChildren(people, random);
 
-            // Show update every 365 days (1 year)
             if ((day + 1) % 365 == 0)
             {
                 yearsPassed++;
                 _logger.Log($"\nYear {yearsPassed} completed - Date: {_currentDate:yyyy-MM-dd}", LogLevel.Important);
 
-                // Debug: Show eligible couples for children
-                var eligibleForChildren = people.Count(p => p.IsAlive
-                    && p.HasPartner
-                    && p.Partner!.IsAlive
-                    && p.Gender != p.Partner.Gender
-                    && p.RelationshipDuration.TotalDays >= 365 * _settings.MinimumRelationshipYearsForChildren
-                    && p.Age < _settings.MaxAgeForChildren
-                    && p.Partner.Age < _settings.MaxAgeForChildren
-                    && p.MaxChildren > 0
-                    && p.NumberOfChildren < p.MaxChildren);
-                _logger.Log($"DEBUG: {eligibleForChildren / 2} couples eligible for children this year", LogLevel.Detailed);
-
                 _statisticsService.DisplaySummary(people);
                 _logger.Log("", LogLevel.Important);
             }
         }
+
+        stopwatch.Stop();
+        var totalSeconds = stopwatch.Elapsed.TotalSeconds;
+        var avgTimePerYear = totalSeconds / yearsPassed;
+
+        _logger.Log("\n═══════════════════════════════════════", LogLevel.Important);
+        _logger.Log($"Simulation completed in {totalSeconds:F2} seconds", LogLevel.Important);
+        _logger.Log($"Average time per year: {avgTimePerYear:F3} seconds", LogLevel.Important);
+        _logger.Log("═══════════════════════════════════════\n", LogLevel.Important);
     }
 
     private void GenerateChildren(List<Person> people, Random random)
     {
-        // Find eligible couples
-        var eligibleParents = people
-            .Where(p => p.IsAlive
-                && p.HasPartner
-                && p.Partner!.IsAlive
-                && p.Gender != p.Partner.Gender
-                && p.RelationshipDuration.TotalDays >= 365 * _settings.MinimumRelationshipYearsForChildren
-                && p.Age < _settings.MaxAgeForChildren
-                && p.Partner.Age < _settings.MaxAgeForChildren
-                && p.MaxChildren > 0
-                && p.NumberOfChildren < p.MaxChildren)
-            .ToList();
-
         var processedCouples = new HashSet<(Person, Person)>();
 
-        foreach (var parent in eligibleParents)
+        for (int i = 0; i < people.Count; i++)
         {
-            // Skip if we already processed this couple
-            var couple = parent.GetHashCode() < parent.Partner!.GetHashCode()
+            var parent = people[i];
+
+            if (!parent.IsAlive || !parent.HasPartner || !parent.Partner!.IsAlive)
+                continue;
+            if (parent.Gender == parent.Partner.Gender)
+                continue;
+            if (parent.RelationshipDuration.TotalDays < 365 * _settings.MinimumRelationshipYearsForChildren)
+                continue;
+            if (parent.Age >= _settings.MaxAgeForChildren || parent.Partner.Age >= _settings.MaxAgeForChildren)
+                continue;
+            if (parent.MaxChildren <= 0 || parent.NumberOfChildren >= parent.MaxChildren)
+                continue;
+
+            var couple = string.Compare(parent.Name, parent.Partner.Name, StringComparison.Ordinal) < 0
                 ? (parent, parent.Partner!)
                 : (parent.Partner!, parent);
 
             if (!processedCouples.Add(couple))
                 continue;
 
-            // Check minimum gap since last child
             if (parent.LastChildBirthDate.HasValue)
             {
                 var daysSinceLastChild = (_currentDate - parent.LastChildBirthDate.Value).TotalDays;
@@ -113,7 +108,6 @@ public class GameLoopService : IGameLoopService
                     continue;
             }
 
-            // Daily probability of conception
             if (random.NextDouble() < _settings.AnnualConceptionProbability / 365.0)
             {
                 var child = _personFactory.CreateChild(parent, parent.Partner!, _currentDate);
@@ -121,7 +115,6 @@ public class GameLoopService : IGameLoopService
                 parent.AddChild(child);
                 parent.Partner!.AddChild(child);
 
-                // Announce the birth
                 _logger.Log($"👶 {child.DisplayName} was born to {parent.DisplayName} and {parent.Partner.DisplayName}!", LogLevel.Normal);
             }
         }
@@ -131,21 +124,24 @@ public class GameLoopService : IGameLoopService
     {
         var familyMembers = new List<string>();
 
-        // Add parents if alive
         if (person.Parent1 != null && person.Parent1.IsAlive)
             familyMembers.Add(person.Parent1.DisplayName);
         if (person.Parent2 != null && person.Parent2.IsAlive)
             familyMembers.Add(person.Parent2.DisplayName);
 
-        // Add children if alive
-        var aliveChildren = person.Children.Where(c => c.IsAlive).ToList();
-        familyMembers.AddRange(aliveChildren.Select(c => c.DisplayName));
+        foreach (var child in person.Children)
+        {
+            if (child.IsAlive)
+                familyMembers.Add(child.DisplayName);
+        }
 
-        // Add siblings if alive
-        var aliveSiblings = person.Siblings.Where(s => s.IsAlive).ToList();
-        familyMembers.AddRange(aliveSiblings.Select(s => s.DisplayName));
+        foreach (var sibling in person.Siblings)
+        {
+            if (sibling.IsAlive)
+                familyMembers.Add(sibling.DisplayName);
+        }
 
-        if (familyMembers.Any())
+        if (familyMembers.Count > 0)
         {
             var familyList = string.Join(", ", familyMembers);
             _logger.Log($"💀 {person.DisplayName} (age {person.Age}) passed away. Saying goodbye: {familyList}.", LogLevel.Normal);
@@ -158,11 +154,9 @@ public class GameLoopService : IGameLoopService
 
     private double CalculateDeathProbability(int age)
     {
-        // Exponential growth formula ensuring no one reaches maximum age
         if (age < _settings.MortalityStartAge) return 0;
         if (age >= _settings.MaximumAge) return 1.0;
 
-        // Exponential formula: death_rate = 0.02 * e^(0.15 * (age - mortalityStartAge))
         double yearsAfterMortalityStart = age - _settings.MortalityStartAge;
         return Math.Min(1.0, 0.02 * Math.Exp(0.15 * yearsAfterMortalityStart));
     }

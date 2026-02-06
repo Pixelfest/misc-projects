@@ -3,74 +3,83 @@
 public class Person
 {
     private DateTime _currentDate;
+    private int _cachedAge;
 
-    public string FirstName { get; private set; }
-    public string LastName { get; private set; }
+    private string FirstName { get; }
+    public string LastName { get; }
     public string Name => $"{FirstName} {LastName}";
     public string DisplayName => HasPartner && Partner!.LastName != LastName
         ? $"{FirstName} {LastName} ({Partner.LastName})"
         : Name;
-    public DateTime BirthDate { get; private set; }
-    public string Location { get; private set; }
+
+    private DateTime BirthDate { get; }
     public string Gender { get; private set; }
-    public IReadOnlyList<string> Licenses { get; private set; }
-    public string EducationLevel { get; private set; }
-    public IReadOnlyList<string> Hobbies { get; private set; }
     public Person? Partner { get; private set; }
-    public DateTime? RelationshipStartDate { get; private set; }
+    private DateTime? RelationshipStartDate { get; set; }
     public bool IsAlive { get; private set; }
     public DateTime? DateOfDeath { get; private set; }
     public int MaxChildren { get; private set; }
-    private List<Person> _children = new List<Person>();
+    private readonly List<Person> _children = [];
     public IReadOnlyList<Person> Children => _children.AsReadOnly();
     public int NumberOfChildren => _children.Count;
-    public DateTime? LastChildBirthDate => _children.Count > 0 ? _children[_children.Count - 1].BirthDate : null;
+    private DateTime? _lastChildBirthDate;
+    public DateTime? LastChildBirthDate => _lastChildBirthDate;
     public Person? Parent1 { get; private set; }
     public Person? Parent2 { get; private set; }
     public bool HasParents => Parent1 != null && Parent2 != null;
 
+    private IReadOnlyList<Person>? _cachedSiblings;
     public IReadOnlyList<Person> Siblings
     {
         get
         {
-            if (!HasParents) return new List<Person>().AsReadOnly();
+            if (_cachedSiblings != null)
+                return _cachedSiblings;
+
+            if (!HasParents)
+            {
+                _cachedSiblings = [];
+                return _cachedSiblings;
+            }
 
             var siblings = new List<Person>();
             if (Parent1 != null)
             {
-                siblings.AddRange(Parent1.Children.Where(c => c != this));
+                foreach (var child in Parent1.Children)
+                {
+                    if (child != this)
+                        siblings.Add(child);
+                }
             }
-            return siblings.Distinct().ToList().AsReadOnly();
+            _cachedSiblings = siblings.AsReadOnly();
+            return _cachedSiblings;
         }
     }
 
-    public int Age => _currentDate.Year - BirthDate.Year - (_currentDate.DayOfYear < BirthDate.DayOfYear ? 1 : 0);
+    public int Age => _cachedAge;
     public bool HasPartner => Partner != null;
     public bool IsLookingForPartner => Age >= 18 && !HasPartner && IsAlive;
     public TimeSpan RelationshipDuration => HasPartner && RelationshipStartDate.HasValue
         ? _currentDate - RelationshipStartDate.Value
         : TimeSpan.Zero;
 
-    public Person(string firstName, string lastName, DateTime birthDate, string location, string gender,
-                  List<string> licenses, string educationLevel, List<string> hobbies)
+    public Person(string firstName, string lastName, DateTime birthDate, string gender, List<string> hobbies)
     {
         FirstName = firstName ?? throw new ArgumentNullException(nameof(firstName));
         LastName = lastName ?? throw new ArgumentNullException(nameof(lastName));
         BirthDate = birthDate;
-        Location = location ?? throw new ArgumentNullException(nameof(location));
         Gender = gender ?? throw new ArgumentNullException(nameof(gender));
-        Licenses = licenses?.AsReadOnly() ?? new List<string>().AsReadOnly();
-        EducationLevel = educationLevel ?? throw new ArgumentNullException(nameof(educationLevel));
-        Hobbies = hobbies?.AsReadOnly() ?? new List<string>().AsReadOnly();
-        _currentDate = birthDate; // Initialize to birth date, will be updated as simulation progresses
+        _currentDate = birthDate;
+        _cachedAge = 0;
         IsAlive = true;
         DateOfDeath = null;
-        MaxChildren = 0; // Will be set when entering a relationship
+        MaxChildren = 0;
     }
 
     public void AdvanceDay(DateTime newDate)
     {
         _currentDate = newDate;
+        _cachedAge = _currentDate.Year - BirthDate.Year - (_currentDate.DayOfYear < BirthDate.DayOfYear ? 1 : 0);
     }
 
     public void SetPartner(Person partner, DateTime relationshipStartDate)
@@ -79,10 +88,10 @@ public class Person
             throw new ArgumentNullException(nameof(partner));
 
         if (HasPartner && Partner != partner)
-            throw new InvalidOperationException($"{Name} already has a partner.");
+            throw new InvalidOperationException($"{DisplayName} already has a partner.");
 
         if (partner.HasPartner && partner.Partner != this)
-            throw new InvalidOperationException($"{partner.Name} already has a partner.");
+            throw new InvalidOperationException($"{partner.DisplayName} already has a partner.");
 
         Partner = partner;
         RelationshipStartDate = relationshipStartDate;
@@ -96,6 +105,8 @@ public class Person
     public void AddChild(Person child)
     {
         _children.Add(child);
+        _lastChildBirthDate = child.BirthDate;
+        _cachedSiblings = null;
     }
 
     public void SetParents(Person parent1, Person parent2)
@@ -104,9 +115,11 @@ public class Person
         Parent2 = parent2;
     }
 
-    public bool IsCompatibleWith(Person other, int maxAgeDifference = 4)
+    public bool IsCompatibleWith(Person? other, int maxAgeDifference = 4)
     {
-        if (other == null) return false;
+        if (other == null)
+            return false;
+
         if (!IsLookingForPartner || !other.IsLookingForPartner) return false;
 
         var ageDifference = Math.Abs(Age - other.Age);

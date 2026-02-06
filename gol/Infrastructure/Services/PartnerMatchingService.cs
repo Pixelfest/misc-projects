@@ -5,7 +5,7 @@ using gol.Domain.Services;
 
 public class PartnerMatchingService : IPartnerMatchingService
 {
-    private static readonly Random _random = new Random();
+    private static readonly Random Random = new();
     private readonly Settings _settings;
     private readonly ILogger _logger;
     private DateTime _currentDate;
@@ -21,11 +21,14 @@ public class PartnerMatchingService : IPartnerMatchingService
     {
         _currentDate = currentDate;
         var eligiblePeople = people.Where(p => p.IsLookingForPartner).ToList();
-        
-        // Shuffle for randomness
-        var shuffled = eligiblePeople.OrderBy(x => _random.Next()).ToList();
-        
-        // Calculate how many same-sex couples we want
+
+        var shuffled = eligiblePeople;
+        for (int i = shuffled.Count - 1; i > 0; i--)
+        {
+            int j = Random.Next(i + 1);
+            (shuffled[i], shuffled[j]) = (shuffled[j], shuffled[i]);
+        }
+
         var totalCouples = shuffled.Count / 2;
         var sameSexCouplesTarget = (int)(totalCouples * _settings.SameSexCouplePercentage);
         var sameSexCouplesCreated = 0;
@@ -41,10 +44,8 @@ public class PartnerMatchingService : IPartnerMatchingService
                 continue;
             }
 
-            // Decide if this should be a same-sex couple
-            var shouldBeSameSex = sameSexCouplesCreated < sameSexCouplesTarget && _random.NextDouble() < 0.3;
-            
-            // Find compatible partner
+            var shouldBeSameSex = sameSexCouplesCreated < sameSexCouplesTarget && Random.NextDouble() < 0.3;
+
             Person? partner = null;
             
             if (shouldBeSameSex)
@@ -55,8 +56,7 @@ public class PartnerMatchingService : IPartnerMatchingService
                     sameSexCouplesCreated++;
                 }
             }
-            
-            // If no same-sex partner found or we want mixed-sex couple
+
             if (partner == null)
             {
                 partner = FindCompatiblePartner(person, shuffled, sameGenderOnly: false);
@@ -73,24 +73,26 @@ public class PartnerMatchingService : IPartnerMatchingService
 
     private Person? FindCompatiblePartner(Person person, List<Person> candidates, bool sameGenderOnly)
     {
-        var eligibleCandidates = candidates
-            .Where(c => c != person && c.IsLookingForPartner && c.IsCompatibleWith(person, _settings.MaxAgeDifference))
-            .ToList();
-
-        if (sameGenderOnly)
+        for (int i = 0; i < candidates.Count; i++)
         {
-            eligibleCandidates = eligibleCandidates
-                .Where(c => c.Gender == person.Gender)
-                .ToList();
-        }
-        else
-        {
-            eligibleCandidates = eligibleCandidates
-                .Where(c => c.Gender != person.Gender)
-                .ToList();
+            var candidate = candidates[i];
+
+            if (candidate == person || !candidate.IsLookingForPartner)
+                continue;
+
+            if (!candidate.IsCompatibleWith(person, _settings.MaxAgeDifference))
+                continue;
+
+            if (sameGenderOnly && candidate.Gender != person.Gender)
+                continue;
+
+            if (!sameGenderOnly && candidate.Gender == person.Gender)
+                continue;
+
+            return candidate;
         }
 
-        return eligibleCandidates.FirstOrDefault();
+        return null;
     }
 
     private void CreatePartnership(Person person1, Person person2)
@@ -98,16 +100,14 @@ public class PartnerMatchingService : IPartnerMatchingService
         person1.SetPartner(person2, _currentDate);
         person2.SetPartner(person1, _currentDate);
 
-        // Announce the relationship
         var relationshipType = person1.Gender == person2.Gender ? "same-sex" : "mixed-sex";
         _logger.Log($"💑 {person1.DisplayName} and {person2.DisplayName} entered a {relationshipType} relationship.", LogLevel.Normal);
 
-        // Determine if they want children and how many (only for mixed-sex couples)
         if (person1.Gender != person2.Gender)
         {
-            if (_random.NextDouble() < _settings.CoupleWantsChildrenPercentage)
+            if (Random.NextDouble() < _settings.CoupleWantsChildrenPercentage)
             {
-                var maxChildren = _random.Next(_settings.MinChildren, _settings.MaxChildren + 1);
+                var maxChildren = Random.Next(_settings.MinChildren, _settings.MaxChildren + 1);
                 person1.SetMaxChildren(maxChildren);
                 person2.SetMaxChildren(maxChildren);
             }

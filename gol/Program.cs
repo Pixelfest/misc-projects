@@ -8,30 +8,39 @@ namespace gol;
 
 class Program
 {
-    static void Main(string[] args)
+    private static void Main()
     {
-        // Load settings
         var settings = new Settings();
+        var services = ConfigureServices(settings);
 
-        // Setup logger
+        var people = services.PersonFactory.CreatePeople(settings.InitialPopulation);
+
+        services.Logger.Log($"Generated {people.Count} people.", LogLevel.Critical);
+        services.Logger.Log($"Starting date: {DateTime.Now.Date:yyyy-MM-dd}", LogLevel.Critical);
+        services.Logger.Log("Running simulation...\n", LogLevel.Critical);
+
+        // Run the sim
+        int daysToSimulate = 365 * settings.YearsToSimulate;
+        services.GameLoopService.RunDays(people, daysToSimulate);
+
+        services.Logger.Log($"Simulation completed: {daysToSimulate} days simulated.", LogLevel.Critical);
+        services.Logger.Log($"End date: {DateTime.Now.Date.AddDays(daysToSimulate):yyyy-MM-dd}", LogLevel.Critical);
+
+        services.StatisticsService.DisplaySummary(people);
+    }
+
+    private static ServiceContainer ConfigureServices(Settings settings)
+    {
         ILogger logger = new ConsoleLogger(settings.LogLevel);
-
-        // Dependency injection setup
         INameGenerator nameGenerator = new RandomNameGenerator();
         IBirthDateGenerator birthDateGenerator = new RandomBirthDateGenerator();
-        ILocationGenerator locationGenerator = new RandomLocationGenerator();
         IGenderGenerator genderGenerator = new RandomGenderGenerator();
-        ILicensesGenerator licensesGenerator = new RandomLicensesGenerator();
-        IEducationLevelGenerator educationLevelGenerator = new RandomEducationLevelGenerator();
         IHobbiesGenerator hobbiesGenerator = new RandomHobbiesGenerator();
 
         IPersonFactory personFactory = new PersonFactory(
             nameGenerator,
             birthDateGenerator,
-            locationGenerator,
             genderGenerator,
-            licensesGenerator,
-            educationLevelGenerator,
             hobbiesGenerator
         );
 
@@ -39,20 +48,13 @@ class Program
         IPartnerMatchingService partnerMatchingService = new PartnerMatchingService(settings, logger);
         IGameLoopService gameLoopService = new GameLoopService(partnerMatchingService, statisticsService, personFactory, settings, logger);
 
-        // Generate people
-        var people = personFactory.CreatePeople(settings.InitialPopulation);
-        logger.Log($"Generated {people.Count} people.", LogLevel.Critical);
-        logger.Log($"Starting date: {DateTime.Now.Date:yyyy-MM-dd}", LogLevel.Critical);
-        logger.Log("Running simulation...\n", LogLevel.Critical);
-
-        // Run game loop
-        int daysToSimulate = 365 * settings.YearsToSimulate;
-        gameLoopService.RunDays(people, daysToSimulate);
-
-        logger.Log($"Simulation completed: {daysToSimulate} days simulated.", LogLevel.Critical);
-        logger.Log($"End date: {DateTime.Now.Date.AddDays(daysToSimulate):yyyy-MM-dd}", LogLevel.Critical);
-
-        // Display summary
-        statisticsService.DisplaySummary(people);
+        return new ServiceContainer(logger, personFactory, statisticsService, gameLoopService);
     }
+
+    private record ServiceContainer(
+        ILogger Logger,
+        IPersonFactory PersonFactory,
+        IStatisticsService StatisticsService,
+        IGameLoopService GameLoopService
+    );
 }
