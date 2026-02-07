@@ -2,32 +2,44 @@
 
 public class Person
 {
-    private DateTime _currentDate;
-    private int _cachedAge;
-
+    // Personal Information
     private string FirstName { get; }
     public string LastName { get; }
     public string Name => $"{FirstName} {LastName}";
     public string DisplayName => HasPartner && Partner!.LastName != LastName
         ? $"{FirstName} {LastName} ({Partner.LastName})"
         : Name;
-
     private DateTime BirthDate { get; }
     public string Gender { get; private set; }
-    public Person? Partner { get; private set; }
-    private DateTime? RelationshipStartDate { get; set; }
+
+    // Lifecycle & State
+    private DateTime _currentDate;
+    private int _cachedAge;
+    public int Age => _cachedAge;
     public bool IsAlive { get; private set; }
     public DateTime? DateOfDeath { get; private set; }
+
+    // Partnership
+    public Person? Partner { get; private set; }
+    private DateTime? RelationshipStartDate { get; set; }
+    public bool HasPartner => Partner != null;
+    public bool IsLookingForPartner => Age >= 18 && !HasPartner && IsAlive;
+    public TimeSpan RelationshipDuration => HasPartner && RelationshipStartDate.HasValue
+        ? _currentDate - RelationshipStartDate.Value
+        : TimeSpan.Zero;
+
+    // Children
     public int MaxChildren { get; private set; }
     private readonly List<Person> _children = [];
     public IReadOnlyList<Person> Children => _children.AsReadOnly();
     public int NumberOfChildren => _children.Count;
     private DateTime? _lastChildBirthDate;
     public DateTime? LastChildBirthDate => _lastChildBirthDate;
+
+    // Parents & Siblings
     public Person? Parent1 { get; private set; }
     public Person? Parent2 { get; private set; }
     public bool HasParents => Parent1 != null && Parent2 != null;
-
     private IReadOnlyList<Person>? _cachedSiblings;
     public IReadOnlyList<Person> Siblings
     {
@@ -55,13 +67,6 @@ public class Person
             return _cachedSiblings;
         }
     }
-
-    public int Age => _cachedAge;
-    public bool HasPartner => Partner != null;
-    public bool IsLookingForPartner => Age >= 18 && !HasPartner && IsAlive;
-    public TimeSpan RelationshipDuration => HasPartner && RelationshipStartDate.HasValue
-        ? _currentDate - RelationshipStartDate.Value
-        : TimeSpan.Zero;
 
     public Person(string firstName, string lastName, DateTime birthDate, string gender, List<string> hobbies)
     {

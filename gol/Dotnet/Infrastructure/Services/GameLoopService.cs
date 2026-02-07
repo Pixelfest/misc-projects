@@ -55,12 +55,12 @@ public class GameLoopService : IGameLoopService
 
             GenerateChildren(people, random);
 
+            _statisticsService.DisplaySummary(people);
+
             if ((day + 1) % 365 == 0)
             {
                 yearsPassed++;
                 _logger.Log($"\nYear {yearsPassed} completed - Date: {_currentDate:yyyy-MM-dd}", LogLevel.Important);
-
-                _statisticsService.DisplaySummary(people);
                 _logger.Log("", LogLevel.Important);
             }
         }
