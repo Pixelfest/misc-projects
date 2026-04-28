@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Number Generators</title>
+	<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+	<div class="container">
+		<header>
+			<h1>Number Generators</h1>
+			<p class="subtitle">Generate and validate various number formats</p>
+		</header>
+
+		<main>
+			<!-- BSN Generator -->
+			<section class="generator-section">
+				<div class="generator-card">
+					<h2>BSN Generator</h2>
+					<p class="description">Dutch citizen identification number (Burgerservicenummer)</p>
+
+					<div class="generator-controls">
+						<button id="generateBsn" class="btn btn-primary">Generate BSN</button>
+						<button id="clearBsn" class="btn btn-secondary">Clear</button>
+					</div>
+
+					<div class="result-section">
+						<label for="bsnOutput">Generated BSN:</label>
+						<input type="text" id="bsnOutput" class="result-input" readonly>
+					</div>
+
+					<div class="validator-section">
+						<label for="bsnInput">Validate BSN:</label>
+						<div class="input-group">
+							<input type="text" id="bsnInput" class="input-field" placeholder="Enter BSN to validate">
+							<button id="validateBsn" class="btn btn-tertiary">Validate</button>
+						</div>
+						<div id="bsnValidationResult" class="validation-result"></div>
+					</div>
+				</div>
+			</section>
+
+			<!-- Add more generators here -->
+		</main>
+
+		<footer>
+			<p>Easily expandable generator framework • Add new generators in <code>generators.js</code></p>
+		</footer>
+	</div>
+
+	<script src="generators.js"></script>
+	<script src="app.js"></script>
+</body>
+
+</html>

@@ -6,13 +6,20 @@ const LANE_WIDTH = 3.75;
 const CAR_WIDTH = 2.0;
 const CAR_LENGTH = 4.6;
 
-// Configurable settings
+// Configurable settings - will be overwritten by HTML input values on load
 let MIN_SPEED_KMH = 80;
 let MAX_SPEED_KMH = 90;
 let HIGHWAY_LENGTH_KM = 1;
 let HIGHWAY_LENGTH_M = HIGHWAY_LENGTH_KM * 1000;
-let NUM_CARS = 1;
+let NUM_CARS = 10;
 let FOLLOWING_DISTANCE_SECONDS = 2.0;
+
+// Car behavior constants
+const NORMAL_BRAKE_RATE = 2.0; // m/s² - realistic braking deceleration
+const EMERGENCY_BRAKE_RATE = 4.0; // m/s² - emergency braking (twice as hard)
+const ACCELERATION_RATE = 1.5; // m/s² - realistic acceleration
+const LANE_CHANGE_CLEARANCE = 6.0; // meters - clearance needed before/after for lane change
+const RIGHT_LANE_RETURN_TIME = 4.0; // seconds - check 4 seconds ahead in right lane before returning
 
 // Canvas settings - wide oval
 const CANVAS_WIDTH = 1600;
@@ -31,31 +38,53 @@ let lastTime = Date.now();
 
 function initializeCars() {
     cars = [];
-    // Half the cars in left lane, half in right lane
-    const carsPerLane = Math.ceil(NUM_CARS / 2);
-    const slowCars = NUM_CARS - carsPerLane;
+    const minCarDistance = 24; // Minimum 24 meters between cars
 
-    // Left lane cars
-    for (let i = 0; i < carsPerLane; i++) {
+    // Create cars with random positions and speeds, ensuring they don't overlap
+    for (let i = 0; i < NUM_CARS; i++) {
         const randomSpeed = MIN_SPEED_KMH + Math.random() * (MAX_SPEED_KMH - MIN_SPEED_KMH);
+        let randomPosition;
+        let attempts = 0;
+        const maxAttempts = 100;
+
+        // Try to find a position that's not too close to existing cars
+        do {
+            randomPosition = Math.random() * HIGHWAY_LENGTH_M;
+            attempts++;
+
+            // Check if this position is far enough from all existing cars
+            let isTooClose = false;
+            for (let j = 0; j < cars.length; j++) {
+                let distance = Math.abs(cars[j].position - randomPosition);
+                // Account for wraparound on the loop
+                distance = Math.min(distance, HIGHWAY_LENGTH_M - distance);
+
+                if (distance < minCarDistance) {
+                    isTooClose = true;
+                    break;
+                }
+            }
+
+            if (!isTooClose || attempts >= maxAttempts) {
+                break;
+            }
+        } while (attempts < maxAttempts);
+
         cars.push({
-            position: (HIGHWAY_LENGTH_M / carsPerLane) * i,
-            lane: 'left',
+            position: randomPosition,
+            lane: 'right',
+            targetLane: 'right',
+            lanePosition: 1.0, // 0.0 = left lane, 1.0 = right lane (smooth transition)
             desiredSpeed: randomSpeed / 3.6, // Convert to m/s
             currentSpeed: randomSpeed / 3.6,
-            color: `hsl(${(360 / carsPerLane) * i}, 70%, 55%)`
-        });
-    }
-
-    // Right lane cars
-    for (let i = 0; i < slowCars; i++) {
-        const randomSpeed = MIN_SPEED_KMH + Math.random() * (MAX_SPEED_KMH - MIN_SPEED_KMH);
-        cars.push({
-            position: (HIGHWAY_LENGTH_M / slowCars) * i + (HIGHWAY_LENGTH_M / (slowCars * 2)),
-            lane: 'right',
-            desiredSpeed: randomSpeed / 3.6,
-            currentSpeed: randomSpeed / 3.6,
-            color: `hsl(${(360 / slowCars) * i + 180}, 70%, 55%)`
+            previousSpeed: randomSpeed / 3.6,
+            color: '#ffffff',
+            transitionTimer: 0,
+            transitionDuration: 1.0 + Math.random() * 1.0, // Random 1-2 seconds
+            isBraking: false,
+            brakeTimer: 0,
+            isEmergencyBraking: false, // For blinking red
+            emergencyBlinkTimer: 0
         });
     }
 }
@@ -63,31 +92,20 @@ function initializeCars() {
 function calculateScale() {
     // For a rounded rectangle track
     const margin = 50; // pixels
-    const totalLanesWidth = LANE_WIDTH * 4; // 2 lanes each side
-
-    // Set dimensions to fill the screen
     const availableWidth = CANVAS_WIDTH - margin * 2;
     const availableHeight = CANVAS_HEIGHT - margin * 2;
 
-    // Track dimensions in pixels
-    const trackWidthPx = availableWidth;
-    const trackHeightPx = availableHeight;
+    ovalA = availableWidth / 2;
+    ovalB = availableHeight / 2;
 
-    ovalA = trackWidthPx / 2;
-    ovalB = trackHeightPx / 2;
-
-    // Corner radius
-    const cornerRadiusPx = Math.min(trackHeightPx, trackWidthPx) / 2;
-
-    // Calculate perimeter: 2 straights + 2 semicircles
-    const straightLength = trackWidthPx - 2 * cornerRadiusPx;
+    const cornerRadiusPx = Math.min(availableHeight, availableWidth) / 2;
+    const straightLength = availableWidth - 2 * cornerRadiusPx;
     const curveLength = Math.PI * cornerRadiusPx;
     const perimeterPx = 2 * straightLength + 2 * curveLength;
 
-    // Now calculate scale based on desired highway length
     scale = perimeterPx / HIGHWAY_LENGTH_M;
 
-    // Recalculate dimensions in meters for info display
+    // Recalculate dimensions in meters
     ovalA = ovalA / scale;
     ovalB = ovalB / scale;
 
@@ -133,72 +151,54 @@ function drawHighway() {
     const centerX = CANVAS_WIDTH / 2;
     const centerY = CANVAS_HEIGHT / 2;
 
-    // Draw grass background
     ctx.fillStyle = '#27ae60';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Calculate dimensions for each lane boundary (in pixels)
     const trackWidth = ovalA * 2 * scale;
     const trackHeight = ovalB * 2 * scale;
-
     const innerWidth = (ovalA - LANE_WIDTH * 2) * 2 * scale;
     const innerHeight = (ovalB - LANE_WIDTH * 2) * 2 * scale;
     const lane1Width = (ovalA - LANE_WIDTH) * 2 * scale;
     const lane1Height = (ovalB - LANE_WIDTH) * 2 * scale;
-    const centerLineWidth = trackWidth;
-    const centerLineHeight = trackHeight;
     const lane2Width = (ovalA + LANE_WIDTH) * 2 * scale;
     const lane2Height = (ovalB + LANE_WIDTH) * 2 * scale;
     const outerWidth = (ovalA + LANE_WIDTH * 2) * 2 * scale;
     const outerHeight = (ovalB + LANE_WIDTH * 2) * 2 * scale;
 
-    // Corner radius should be roughly equal to the shorter dimension
     const cornerRadius = Math.min(trackHeight, trackWidth) / 2;
-
-    // Adjust corner radii for each lane to maintain parallel curves
     const innerCornerRadius = cornerRadius - LANE_WIDTH * 2 * scale;
     const lane1CornerRadius = cornerRadius - LANE_WIDTH * scale;
     const centerCornerRadius = cornerRadius;
     const lane2CornerRadius = cornerRadius + LANE_WIDTH * scale;
     const outerCornerRadius = cornerRadius + LANE_WIDTH * 2 * scale;
 
-    // Draw outer asphalt
     ctx.fillStyle = '#34495e';
     drawRoundedRect(centerX - outerWidth/2, centerY - outerHeight/2, outerWidth, outerHeight, outerCornerRadius);
     ctx.fill();
 
-    // Cut out inner area
     ctx.fillStyle = '#1e272e';
     drawRoundedRect(centerX - innerWidth/2, centerY - innerHeight/2, innerWidth, innerHeight, innerCornerRadius);
     ctx.fill();
 
-    // Draw outer edge
     ctx.strokeStyle = '#f5f6fa';
     ctx.lineWidth = 2;
     drawRoundedRect(centerX - outerWidth/2, centerY - outerHeight/2, outerWidth, outerHeight, outerCornerRadius);
     ctx.stroke();
-
-    // Draw inner edge
     drawRoundedRect(centerX - innerWidth/2, centerY - innerHeight/2, innerWidth, innerHeight, innerCornerRadius);
     ctx.stroke();
 
-    // Draw lane dividers (dashed yellow lines)
     ctx.strokeStyle = '#f1c40f';
     ctx.lineWidth = 2;
     ctx.setLineDash([10, 10]);
-
-    // Inner lane divider
     drawRoundedRect(centerX - lane1Width/2, centerY - lane1Height/2, lane1Width, lane1Height, lane1CornerRadius);
     ctx.stroke();
 
-    // Center line (solid yellow)
     ctx.strokeStyle = '#f39c12';
     ctx.lineWidth = 3;
     ctx.setLineDash([]);
-    drawRoundedRect(centerX - centerLineWidth/2, centerY - centerLineHeight/2, centerLineWidth, centerLineHeight, centerCornerRadius);
+    drawRoundedRect(centerX - trackWidth/2, centerY - trackHeight/2, trackWidth, trackHeight, centerCornerRadius);
     ctx.stroke();
 
-    // Outer lane divider
     ctx.strokeStyle = '#f1c40f';
     ctx.lineWidth = 2;
     ctx.setLineDash([10, 10]);
@@ -208,51 +208,42 @@ function drawHighway() {
     ctx.setLineDash([]);
 }
 
-function getCarPosition(carPosition, lane) {
+function getCarPosition(carPosition, lanePosition) {
     const centerX = CANVAS_WIDTH / 2;
     const centerY = CANVAS_HEIGHT / 2;
 
-    // Car travels in the bottom lanes (right side of center divider)
     const trackWidth = ovalA * 2 * scale;
     const trackHeight = ovalB * 2 * scale;
     const cornerRadius = Math.min(trackHeight, trackWidth) / 2;
 
-    // Left lane (inner) vs right lane (outer)
-    const laneOffset = lane === 'left' ? LANE_WIDTH * 0.5 * scale : LANE_WIDTH * 1.5 * scale;
+    const leftLaneOffset = LANE_WIDTH * 0.5 * scale;
+    const rightLaneOffset = LANE_WIDTH * 1.5 * scale;
+    const laneOffset = leftLaneOffset + (rightLaneOffset - leftLaneOffset) * lanePosition;
 
-    // Calculate track perimeter (2 straights + 2 semicircles)
     const straightLength = (trackWidth - 2 * cornerRadius);
     const curveLength = Math.PI * cornerRadius;
     const totalPerimeter = 2 * straightLength + 2 * curveLength;
 
-    // Normalize position to [0, totalPerimeter]
     const pos = (carPosition * scale) % totalPerimeter;
 
     let carX, carY, angle;
 
-    // Top straight (moving right, in the bottom lane of top section)
     if (pos < straightLength) {
         carX = centerX - trackWidth/2 + cornerRadius + pos;
         carY = centerY - trackHeight/2 + laneOffset;
         angle = 0;
-    }
-    // Top-right corner (in the bottom lane)
-    else if (pos < straightLength + curveLength) {
+    } else if (pos < straightLength + curveLength) {
         const arcPos = pos - straightLength;
         const arcAngle = arcPos / cornerRadius;
         carX = centerX + trackWidth/2 - cornerRadius + (cornerRadius - laneOffset) * Math.sin(arcAngle);
         carY = centerY - trackHeight/2 + cornerRadius - (cornerRadius - laneOffset) * Math.cos(arcAngle);
         angle = arcAngle;
-    }
-    // Bottom straight (moving left, in the bottom lane of bottom section)
-    else if (pos < 2 * straightLength + curveLength) {
+    } else if (pos < 2 * straightLength + curveLength) {
         const straightPos = pos - straightLength - curveLength;
         carX = centerX + trackWidth/2 - cornerRadius - straightPos;
         carY = centerY + trackHeight/2 - laneOffset;
         angle = Math.PI;
-    }
-    // Bottom-left corner (in the bottom lane)
-    else {
+    } else {
         const arcPos = pos - 2 * straightLength - curveLength;
         const arcAngle = arcPos / cornerRadius;
         carX = centerX - trackWidth/2 + cornerRadius - (cornerRadius - laneOffset) * Math.sin(arcAngle);
@@ -264,25 +255,39 @@ function getCarPosition(carPosition, lane) {
 }
 
 function drawCar(car) {
-    const { carX, carY, angle } = getCarPosition(car.position, car.lane);
+    const { carX, carY, angle } = getCarPosition(car.position, car.lanePosition);
 
-    // Draw car
     ctx.save();
     ctx.translate(carX, carY);
-    ctx.rotate(angle + Math.PI / 2); // Add 90 degrees to fix orientation
+    ctx.rotate(angle + Math.PI / 2);
 
-    // Car body
     const carWidthPx = CAR_WIDTH * scale;
     const carLengthPx = CAR_LENGTH * scale;
 
-    ctx.fillStyle = car.color;
+    // Emergency braking: blink red (4 times per second)
+    let carColor = car.color;
+    if (car.isEmergencyBraking) {
+        const blinkFrequency = 8;
+        const isRedPhase = Math.floor(car.emergencyBlinkTimer * blinkFrequency) % 2 === 0;
+        carColor = isRedPhase ? '#FF0000' : car.color;
+    }
+
+    ctx.fillStyle = carColor;
     ctx.fillRect(-carWidthPx / 2, -carLengthPx / 2, carWidthPx, carLengthPx);
 
-    // Car windows
     ctx.fillStyle = '#34495e';
     ctx.fillRect(-carWidthPx / 2 + 2, -carLengthPx / 2 + 5, carWidthPx - 4, carLengthPx / 3);
 
-    // Car outline
+    // Brake lights
+    if (car.isBraking) {
+        ctx.strokeStyle = '#FF0000';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(-carWidthPx / 2 + 2, carLengthPx / 2 - 1);
+        ctx.lineTo(carWidthPx / 2 - 2, carLengthPx / 2 - 1);
+        ctx.stroke();
+    }
+
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
     ctx.strokeRect(-carWidthPx / 2, -carLengthPx / 2, carWidthPx, carLengthPx);
@@ -290,68 +295,206 @@ function drawCar(car) {
     ctx.restore();
 }
 
-function getDistanceToCarAhead(car, carIndex) {
-    // Find the next car in the same lane
+// Helper functions for car detection
+function getDistanceToCarAhead(car, carIndex, targetLane = null) {
+    const checkLane = targetLane !== null ? targetLane : car.targetLane;
     let minDistance = Infinity;
-    let carAheadSpeed = null;
+    let carAhead = null;
 
     for (let i = 0; i < cars.length; i++) {
         if (i === carIndex) continue;
         const otherCar = cars[i];
 
-        // Only check cars in the same lane
-        if (otherCar.lane !== car.lane) continue;
+        // Check cars in target lane or transitioning to target lane
+        const otherCarLane = otherCar.targetLane;
+        if (otherCarLane !== checkLane) continue;
 
-        // Calculate distance (accounting for loop)
         let distance = otherCar.position - car.position;
-        if (distance < 0) {
-            distance += HIGHWAY_LENGTH_M;
-        }
+        if (distance < 0) distance += HIGHWAY_LENGTH_M;
 
         if (distance > 0 && distance < minDistance) {
             minDistance = distance;
-            carAheadSpeed = otherCar.currentSpeed;
+            carAhead = otherCar;
         }
     }
 
-    return { distance: minDistance, speed: carAheadSpeed };
+    return { distance: minDistance, carAhead: carAhead };
 }
 
-function animate() {
-    const currentTime = Date.now();
-    const deltaTime = (currentTime - lastTime) / 1000; // in seconds
-    lastTime = currentTime;
+function getDistanceToCarBehind(car, carIndex, targetLane = null) {
+    const checkLane = targetLane !== null ? targetLane : car.lane;
+    let minDistance = Infinity;
+    let carBehind = null;
 
-    // Update car speeds based on following distance
     for (let i = 0; i < cars.length; i++) {
-        const car = cars[i];
-        const { distance, speed: carAheadSpeed } = getDistanceToCarAhead(car, i);
+        if (i === carIndex) continue;
+        const otherCar = cars[i];
 
-        // Calculate safe following distance based on current speed
-        const safeDistance = car.currentSpeed * FOLLOWING_DISTANCE_SECONDS;
+        const otherCarLane = otherCar.targetLane;
+        if (otherCarLane !== checkLane) continue;
 
-        if (distance < safeDistance && carAheadSpeed !== null) {
-            // Match speed of car ahead (or slow down)
-            car.currentSpeed = Math.min(car.currentSpeed, carAheadSpeed);
-        } else {
-            // Gradually accelerate back to desired speed
-            if (car.currentSpeed < car.desiredSpeed) {
-                car.currentSpeed = Math.min(car.desiredSpeed, car.currentSpeed + 2 * deltaTime); // Accelerate at 2 m/s²
+        let distance = car.position - otherCar.position;
+        if (distance < 0) distance += HIGHWAY_LENGTH_M;
+
+        if (distance > 0 && distance < minDistance) {
+            minDistance = distance;
+            carBehind = otherCar;
+        }
+    }
+
+    return { distance: minDistance, carBehind: carBehind };
+}
+
+function simulateTimeStep(deltaTime) {
+    // Update emergency blink timers
+    for (let car of cars) {
+        if (car.isEmergencyBraking) {
+            car.emergencyBlinkTimer += deltaTime;
+            if (car.emergencyBlinkTimer >= 1.0) {
+                car.isEmergencyBraking = false;
+                car.emergencyBlinkTimer = 0;
             }
         }
+    }
+
+    // RULE: Lane changes
+    for (let i = 0; i < cars.length; i++) {
+        const car = cars[i];
+
+        // Only change lanes if not currently transitioning
+        if (car.targetLane === car.lane) {
+            if (car.lane === 'right') {
+                // Rule: Move to left lane if there's a slower car ahead AND left lane is clear (6m before/after)
+                const { distance: distRightAhead, carAhead: carRightAhead } = getDistanceToCarAhead(car, i, 'right');
+
+                // Only change lanes if there's a car ahead that's slower
+                if (carRightAhead && carRightAhead.desiredSpeed < car.desiredSpeed) {
+                    const { distance: distAhead } = getDistanceToCarAhead(car, i, 'left');
+                    const { distance: distBehind } = getDistanceToCarBehind(car, i, 'left');
+
+                    if (distAhead >= LANE_CHANGE_CLEARANCE && distBehind >= LANE_CHANGE_CLEARANCE) {
+                        car.targetLane = 'left';
+                        car.transitionTimer = 0;
+                    }
+                }
+            } else if (car.lane === 'left') {
+                // Rule: Return to right lane when no slower car in right lane within 4 seconds
+                // New rule: Don't return if driving slower than desired speed
+                const isAtDesiredSpeed = car.currentSpeed >= car.desiredSpeed - 0.5; // Allow small tolerance
+
+                if (isAtDesiredSpeed) {
+                    const { distance: distRightAhead, carAhead: carRightAhead } = getDistanceToCarAhead(car, i, 'right');
+                    const fourSecondDistance = car.currentSpeed * RIGHT_LANE_RETURN_TIME;
+
+                    let canReturn = true;
+                    if (carRightAhead && distRightAhead < fourSecondDistance) {
+                        if (carRightAhead.desiredSpeed < car.desiredSpeed) {
+                            canReturn = false;
+                        }
+                    }
+
+                    if (canReturn) {
+                        const { distance: distAhead } = getDistanceToCarAhead(car, i, 'right');
+                        const { distance: distBehind } = getDistanceToCarBehind(car, i, 'right');
+
+                        if (distAhead >= LANE_CHANGE_CLEARANCE && distBehind >= LANE_CHANGE_CLEARANCE) {
+                            car.targetLane = 'right';
+                            car.transitionTimer = 0;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Smoothly transition between lanes
+        if (car.targetLane !== car.lane) {
+            car.transitionTimer += deltaTime;
+            const progress = Math.min(car.transitionTimer / car.transitionDuration, 1.0);
+
+            if (car.targetLane === 'left') {
+                car.lanePosition = 1.0 - progress;
+            } else {
+                car.lanePosition = progress;
+            }
+
+            if (progress >= 1.0) {
+                car.lane = car.targetLane;
+                car.lanePosition = car.targetLane === 'left' ? 0.0 : 1.0;
+            }
+        }
+    }
+
+    // RULE: Speed control
+    for (let i = 0; i < cars.length; i++) {
+        const car = cars[i];
+
+        const { distance, carAhead } = getDistanceToCarAhead(car, i);
+        const emergencyThreshold = car.currentSpeed * 0.5; // 0.5 seconds
+        const safeDistance = car.currentSpeed * FOLLOWING_DISTANCE_SECONDS;
+
+        let targetSpeed = car.desiredSpeed;
+        let brakeRate = 0;
+
+        if (carAhead) {
+            // Rule: Emergency brake (twice as hard) when closer than 0.5 seconds
+            if (distance < emergencyThreshold) {
+                targetSpeed = carAhead.currentSpeed - (20 / 3.6); // 20 km/h slower
+                brakeRate = EMERGENCY_BRAKE_RATE;
+            }
+            // Rule: Normal brake when encountering slower car
+            else if (distance < safeDistance && carAhead.currentSpeed < car.currentSpeed) {
+                targetSpeed = carAhead.currentSpeed;
+                brakeRate = NORMAL_BRAKE_RATE;
+            }
+        }
+
+        // Apply braking or acceleration
+        if (targetSpeed < car.currentSpeed) {
+            // Braking
+            car.currentSpeed = Math.max(targetSpeed, car.currentSpeed - brakeRate * deltaTime);
+
+            if (car.currentSpeed < car.previousSpeed - 0.1) {
+                car.isBraking = true;
+                car.brakeTimer = 0;
+            }
+        } else if (targetSpeed > car.currentSpeed) {
+            // Rule: Accelerate to desired speed with realistic acceleration
+            car.currentSpeed = Math.min(targetSpeed, car.currentSpeed + ACCELERATION_RATE * deltaTime);
+
+            if (car.isBraking) {
+                car.brakeTimer += deltaTime;
+                if (car.brakeTimer >= 0.5) {
+                    car.isBraking = false;
+                }
+            }
+        } else {
+            if (car.isBraking) {
+                car.brakeTimer += deltaTime;
+                if (car.brakeTimer >= 0.5) {
+                    car.isBraking = false;
+                }
+            }
+        }
+
+        car.previousSpeed = car.currentSpeed;
     }
 
     // Update car positions
     for (let car of cars) {
         car.position += car.currentSpeed * deltaTime;
-
-        // Loop around
         if (car.position >= HIGHWAY_LENGTH_M) {
             car.position -= HIGHWAY_LENGTH_M;
         }
     }
+}
 
-    // Draw
+function animate() {
+    const currentTime = Date.now();
+    const deltaTime = (currentTime - lastTime) / 1000;
+    lastTime = currentTime;
+
+    simulateTimeStep(deltaTime);
+
     drawHighway();
     for (let car of cars) {
         drawCar(car);
@@ -373,10 +516,35 @@ function updateSimulation() {
     calculateScale();
     updateInfo();
     initializeCars();
+
+    // Run 10 seconds of simulation before displaying
+    const warmupTime = 10.0;
+    const timeStep = 0.05;
+    const steps = Math.floor(warmupTime / timeStep);
+
+    for (let i = 0; i < steps; i++) {
+        simulateTimeStep(timeStep);
+    }
+}
+
+function triggerRandomBrake() {
+    if (cars.length === 0) return;
+
+    const randomIndex = Math.floor(Math.random() * cars.length);
+    const car = cars[randomIndex];
+
+    car.currentSpeed = car.currentSpeed / 2;
+    car.desiredSpeed = car.currentSpeed;
+    car.isBraking = true;
+    car.brakeTimer = 0;
+    car.isEmergencyBraking = true;
+    car.emergencyBlinkTimer = 0;
+
+    setTimeout(() => {
+        car.desiredSpeed = (MIN_SPEED_KMH + Math.random() * (MAX_SPEED_KMH - MIN_SPEED_KMH)) / 3.6;
+    }, 2000);
 }
 
 // Initialize
-calculateScale();
-updateInfo();
-initializeCars();
+updateSimulation();
 animate();
