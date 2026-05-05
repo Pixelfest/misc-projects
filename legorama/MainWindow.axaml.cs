@@ -8,6 +8,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Legorama.Helpers;
@@ -41,6 +42,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 	{
 		InitializeComponent();
 		DataContext = this;
+
+		using var iconStream = AssetLoader.Open(new Uri("avares://Legorama/Assets/benl.png"));
+		Icon = new WindowIcon(iconStream);
 
 		_saveFeedbackTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.2) };
 		_saveFeedbackTimer.Tick += OnSaveFeedbackTimerTick;
@@ -289,6 +293,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 		}
 
 		Entries.Move(index, index - 1);
+		SelectedEntry = Entries[index - 1];
 		SaveConfiguration();
 	}
 
@@ -306,6 +311,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 		}
 
 		Entries.Move(index, index + 1);
+		SelectedEntry = Entries[index + 1];
 		SaveConfiguration();
 	}
 

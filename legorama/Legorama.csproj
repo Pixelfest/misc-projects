@@ -7,6 +7,15 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
+    <AvaloniaResource Include="Assets\benl.png" />
+    <AvaloniaResource Include="Assets\benl.ico" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <ApplicationIcon>Assets\benl.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
     <AvaloniaXaml Remove=".github\**" />
     <Compile Remove=".github\**" />
     <EmbeddedResource Remove=".github\**" />
