@@ -1,9 +1,9 @@
 name: pixel-fest
 
 services:
-  pixel:
-    container_name: pixel
-    image: pixel
+  website:
+    container_name: pixel-website
+    image: pixel-website
     build: .
     ports:
       - "8088:80"

@@ -15,12 +15,18 @@ because the browser is sent raw `.ts` files. To use a static server, serve the b
 
 ## Deploy with Docker
 
+Only Docker is needed on the server (Node is not): the image builds the app itself.
+
 ```bash
-npm run deploy
+docker compose up -d --build
 ```
 
 This builds the image and (re)starts a single container named `pixel` in the background, replacing the
-previous one, on http://localhost:8088. It restarts automatically after a reboot. Stop and remove it with
-`npm run undeploy`.
+previous one, on http://localhost:8088. It restarts automatically after a reboot.
+Stop and remove it with `docker compose down`.
 
-Without npm: `docker compose up -d --build`.
+On a machine with Node, `npm run deploy` and `npm run undeploy` do the same.
+
+The container speaks plain HTTP only (port 80 inside, 8088 on the host). TLS, hostname and routing are left to
+whatever reverse proxy runs on the server: point it at `http://<host>:8088`. The app uses relative paths, so it
+also works under a subpath such as `/pixel/`.
