@@ -1,0 +1,7 @@
+services:
+  pixel-fest:
+    build: .
+    image: pixel-fest
+    ports:
+      - "8088:80"
+    restart: unless-stopped
