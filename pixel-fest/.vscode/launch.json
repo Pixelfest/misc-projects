@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+     {
+      "name": "Pixel Fest (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "dev server"
+    }
+  ]
+}
