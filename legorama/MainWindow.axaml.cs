@@ -167,6 +167,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
 	public IBrush CurrentRightRevealBrush => BitmapHelper.GetBrush(CurrentRightSideRevealColor);
 
+	public bool IsRevealVisible => _isRevealVisible;
+
+	public bool IsRevealHidden => !_isRevealVisible;
+
+	public IBrush CurrentLeftRevealBorderBrush => _isRevealVisible ? BitmapHelper.GetBrush(CurrentLeftSideRevealColor) : Brushes.Transparent;
+
+	public IBrush CurrentRightRevealBorderBrush => _isRevealVisible ? BitmapHelper.GetBrush(CurrentRightSideRevealColor) : Brushes.Transparent;
+
 	public Bitmap? CurrentLeftImage => _currentLeftImage;
 
 	public Bitmap? CurrentRightImage => _currentRightImage;
@@ -565,6 +573,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 		OnPropertyChanged(nameof(CurrentRightRevealText));
 		OnPropertyChanged(nameof(CurrentLeftRevealBrush));
 		OnPropertyChanged(nameof(CurrentRightRevealBrush));
+		OnPropertyChanged(nameof(IsRevealVisible));
+		OnPropertyChanged(nameof(IsRevealHidden));
+		OnPropertyChanged(nameof(CurrentLeftRevealBorderBrush));
+		OnPropertyChanged(nameof(CurrentRightRevealBorderBrush));
 	}
 
 	private void RandomizePresentationSides()

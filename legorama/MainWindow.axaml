@@ -131,32 +131,82 @@
 
             <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="12" Margin="12,0,12,8">
                 <Grid Grid.Column="0" RowDefinitions="8*,2*" RowSpacing="12">
-                    <Border Grid.Row="0" Background="#2A2A2A" CornerRadius="8" BorderBrush="#00a3da" BorderThickness="26">
+                    <Border Grid.Row="0" Background="#2A2A2A" CornerRadius="8"
+                            BorderBrush="{Binding CurrentLeftRevealBorderBrush}"
+                            BorderThickness="26">
                         <Image Source="{Binding CurrentLeftImage}" Stretch="Uniform" />
                     </Border>
                     <Border Grid.Row="1" Background="#1B1B1B" CornerRadius="8" Padding="10">
-                        <TextBlock Text="{Binding CurrentLeftRevealText}"
-                                   Foreground="{Binding CurrentLeftRevealBrush}"
-                                   FontSize="42"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   TextAlignment="Center" />
+                        <Grid>
+                            <!-- VAK A: shown when not revealed, bold large sans-serif -->
+                            <TextBlock Text="VAK A"
+                                       IsVisible="{Binding IsRevealHidden}"
+                                       Foreground="#eeeeee"
+                                       FontSize="102"
+                                       FontWeight="Bold"
+                                       FontFamily="Arial,Helvetica,sans-serif"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                            <!-- Answer: shown when revealed, on top of dimmed VAK A -->
+                            <TextBlock Text="VAK A"
+                                       IsVisible="{Binding IsRevealVisible}"
+                                       Foreground="#333333"
+                                       FontSize="102"
+                                       FontWeight="Bold"
+                                       FontFamily="Arial,Helvetica,sans-serif"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                            <TextBlock Text="{Binding CurrentLeftRevealText}"
+                                       IsVisible="{Binding IsRevealVisible}"
+                                       Foreground="{Binding CurrentLeftRevealBrush}"
+                                       FontSize="52"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                        </Grid>
                     </Border>
                 </Grid>
 
                 <Grid Grid.Column="1" RowDefinitions="8*,2*" RowSpacing="12">
-                    <Border Grid.Row="0" Background="#2A2A2A" CornerRadius="8" BorderBrush="#b51c7d" BorderThickness="26">
+                    <Border Grid.Row="0" Background="#2A2A2A" CornerRadius="8"
+                            BorderBrush="{Binding CurrentRightRevealBorderBrush}"
+                            BorderThickness="26">
                         <Image Source="{Binding CurrentRightImage}" Stretch="Uniform" />
                     </Border>
                     <Border Grid.Row="1" Background="#1B1B1B" CornerRadius="8" Padding="10">
-                        <TextBlock Text="{Binding CurrentRightRevealText}"
-                                   Foreground="{Binding CurrentRightRevealBrush}"
-                                   FontSize="42"
-                                   FontWeight="Bold"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   TextAlignment="Center" />
+                        <Grid>
+                            <!-- VAK B: shown when not revealed, bold large sans-serif -->
+                            <TextBlock Text="VAK B"
+                                       IsVisible="{Binding IsRevealHidden}"
+                                       Foreground="#eeeeee"
+                                       FontSize="102"
+                                       FontWeight="Bold"
+                                       FontFamily="Arial,Helvetica,sans-serif"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                            <!-- Answer: shown when revealed, on top of dimmed VAK B -->
+                            <TextBlock Text="VAK B"
+                                       IsVisible="{Binding IsRevealVisible}"
+                                       Foreground="#333333"
+                                       FontSize="102"
+                                       FontWeight="Bold"
+                                       FontFamily="Arial,Helvetica,sans-serif"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                            <TextBlock Text="{Binding CurrentRightRevealText}"
+                                       IsVisible="{Binding IsRevealVisible}"
+                                       Foreground="{Binding CurrentRightRevealBrush}"
+                                       FontSize="52"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       TextAlignment="Center" />
+                        </Grid>
                     </Border>
                 </Grid>
             </Grid>

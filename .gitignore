@@ -13,6 +13,7 @@
 # Test data stuff
 Hok.Content/Uploads/
 Hok.Content/Members/
+dist/
 
 
 # User-specific files (MonoDevelop/Xamarin Studio)
