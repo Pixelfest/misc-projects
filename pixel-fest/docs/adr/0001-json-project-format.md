@@ -5,5 +5,5 @@ A **Project** is saved as a `.pixelfest.json` file with a `version` field, a sha
 ## Consequences
 
 - Undo history is not stored in the file.
-- Autosave to IndexedDB uses the same structure.
+- Cloud storage (ADR 0003) stores the same JSON string per **Project**. The earlier IndexedDB autosave was removed when cloud storage was added.
 - Exported WebP is one-way: it cannot be loaded back as a **Project**.

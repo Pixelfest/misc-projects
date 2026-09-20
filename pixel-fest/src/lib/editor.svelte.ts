@@ -4,7 +4,7 @@ import {
   type Frame, type Project, type RGBA,
 } from './model'
 import { computePalette } from './palette'
-import { deserializeProject, readAutosave, serializeProject, writeAutosave } from './storage'
+import { deserializeProject, serializeProject } from './storage'
 
 export type Tool = 'pencil' | 'line' | 'fill' | 'picker' | 'select' | 'shift'
 
@@ -44,7 +44,12 @@ class Editor {
   onionOpacity = $state(0.35)
   palette = $state.raw<RGBA[]>([])
   selection = $state.raw<Selection | null>(null)
+  /** True when there are changes not yet written to a file (or, in a Library, not yet marked as safe). */
   dirty = $state(false)
+  /** Bumped on every change to the project's content or name; cloud sync compares it with what it last uploaded. */
+  editVersion = $state(0)
+  /** Bumped whenever a different project replaces the open one (new / open). */
+  projectKey = $state(0)
   canUndo = $state(false)
   canRedo = $state(false)
   error = $state('')
@@ -52,7 +57,6 @@ class Editor {
   private done: HistoryEntry[] = []
   private undone: HistoryEntry[] = []
   private drag: Drag | null = null
-  private autosaveTimer: ReturnType<typeof setTimeout> | undefined
 
   get frame(): Frame {
     return this.project.frames[this.current]
@@ -72,27 +76,8 @@ class Editor {
     this.rev++
     this.settledRev++
     this.dirty = true
+    this.editVersion++
     this.palette = computePalette(this.project)
-    clearTimeout(this.autosaveTimer)
-    this.autosaveTimer = setTimeout(() => void this.autosave(), 800)
-  }
-
-  private async autosave() {
-    try {
-      this.commitSelection()
-      await writeAutosave(await serializeProject(this.project))
-    } catch {
-      /* autosave is best-effort */
-    }
-  }
-
-  async restoreAutosave() {
-    try {
-      const text = await readAutosave()
-      if (text) this.replaceProject(await deserializeProject(text), false)
-    } catch {
-      /* ignore a missing or damaged autosave */
-    }
   }
 
   private pushHistory(entry: HistoryEntry) {
@@ -129,6 +114,7 @@ class Editor {
 
   /** Replaces the whole project and forgets undo history (new / open). */
   replaceProject(p: Project, markDirty = true) {
+    this.projectKey++
     this.project = p
     this.current = 0
     this.selection = null
@@ -174,6 +160,7 @@ class Editor {
   setName(name: string) {
     this.project = { ...this.project, name }
     this.dirty = true
+    this.editVersion++
   }
 
   setLoop(loop: number) {

@@ -7,4 +7,36 @@ services:
     build: .
     ports:
       - "8088:80"
+    depends_on:
+      - api
     restart: unless-stopped
+
+  api:
+    container_name: pixel-api
+    image: pixel-api
+    build: ./api
+    environment:
+      ConnectionStrings__Db: "Host=db;Database=pixelfest;Username=pixelfest;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    container_name: pixel-db
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: pixelfest
+      POSTGRES_USER: pixelfest
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - pixel-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pixelfest -d pixelfest"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  pixel-db-data:

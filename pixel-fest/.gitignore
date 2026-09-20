@@ -25,3 +25,8 @@ dist-ssr
 
 !.vscode/tasks.json
 !.vscode/launch.json
+
+# Cloud storage
+.env
+bin
+obj

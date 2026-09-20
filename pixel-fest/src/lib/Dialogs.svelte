@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from 'svelte'
+  import { cloud } from './cloud.svelte'
   import { editor } from './editor.svelte'
   import { MAX_SIZE } from './model'
   import { downloadBlob } from './storage'
@@ -23,11 +24,18 @@
     height = 32
   }
 
-  function submit(e: SubmitEvent) {
+  async function submit(e: SubmitEvent) {
     e.preventDefault()
     if (!validSize) return
-    if (kind === 'new') editor.newProject(name, width, height)
-    else editor.resize(width, height, ax, ay)
+    if (kind === 'new') {
+      await cloud.flush()
+      editor.newProject(name, width, height)
+      onclose()
+      // A new project is saved to the Library straight away rather than at the next 10 second tick.
+      void cloud.tick()
+      return
+    }
+    editor.resize(width, height, ax, ay)
     onclose()
   }
 
@@ -131,7 +139,7 @@
           </div>
         {/if}
         {#if !validSize}<p class="err">Size must be whole numbers from 1 to {MAX_SIZE}.</p>{/if}
-        {#if kind === 'new' && editor.dirty}<p class="note">Your current project will be replaced. Save it first if you want to keep it.</p>{/if}
+        {#if kind === 'new' && !cloud.secret && editor.dirty}<p class="note">Your current project will be replaced. Save it first if you want to keep it.</p>{/if}
         <div class="buttons">
           <button type="button" onclick={onclose}>Cancel</button>
           <button class="primary" type="submit" disabled={!validSize}>{kind === 'new' ? 'Create' : 'Resize'}</button>

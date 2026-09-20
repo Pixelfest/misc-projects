@@ -5,8 +5,16 @@ A web app for drawing low-resolution pixel art and animations, one pixel at a ti
 ## Language
 
 **Project**:
-The whole document: a canvas size, an ordered list of **Frames**, and a loop setting. Can be saved to disk and loaded on another machine.
+The whole document: a canvas size, an ordered list of **Frames**, and a loop setting. Can be saved to disk and loaded on another machine, or kept in a **Library**.
 _Avoid_: file, document, drawing
+
+**Library**:
+A named-by-link collection of **Projects** kept in cloud storage, with no owner, account or personal information attached. Whoever holds the **Library link** can read, change and delete everything in it.
+_Avoid_: account, workspace, vault, cloud folder
+
+**Library link**:
+The secret URL that opens a **Library**. It contains a random UUID and is the only credential: there is no login and no recovery, so a lost link means a lost **Library**. Keeping it safe is the user's responsibility.
+_Avoid_: share link, id, key, token
 
 **Canvas size**:
 The width and height in pixels shared by every **Frame** in a **Project**, each between 1 and 128. Chosen at creation, resizable later by cropping or padding.

@@ -6,4 +6,5 @@ export default defineConfig({
   base: './',
   plugins: [svelte()],
   optimizeDeps: { exclude: ['wasm-webp'] },
+  server: { proxy: { '/api': 'http://localhost:8080' } },
 })

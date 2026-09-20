@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import { cloud } from './lib/cloud.svelte'
+  import CloudDialog from './lib/CloudDialog.svelte'
   import ColorPanel from './lib/ColorPanel.svelte'
   import Dialogs from './lib/Dialogs.svelte'
   import { editor, type Tool } from './lib/editor.svelte'
@@ -19,7 +21,7 @@
   let leftOpen = $state(false)
   let rightOpen = $state(false)
   let menuOpen = $state(false)
-  let dialog = $state<'new' | 'resize' | 'export' | null>(null)
+  let dialog = $state<'new' | 'resize' | 'export' | 'cloud' | null>(null)
   let fileHandle: Parameters<typeof saveProjectFile>[2] = null
   let toast = $state('')
   let toastTimer: ReturnType<typeof setTimeout>
@@ -43,12 +45,14 @@
 
   async function open() {
     menuOpen = false
-    if (editor.dirty && !confirm('Opening a file replaces your current project. Continue?')) return
+    if (!cloud.secret && editor.dirty && !confirm('Opening a file replaces your current project. Continue?')) return
     const file = await pickTextFile()
     if (!file) return
     try {
+      await cloud.flush()
       await editor.openText(file.text)
       fileHandle = null
+      void cloud.tick()
       say(`Opened ${file.name}`)
     } catch (e) {
       say((e as Error).message)
@@ -78,9 +82,17 @@
     if (tool) editor.setTool(tool.id)
   }
 
+  // A Library link opened from the address bar, or a conflict, needs the Library dialog straight away.
+  $effect(() => {
+    if (cloud.pendingOpen || cloud.status === 'conflict') {
+      cloud.pendingOpen = false
+      dialog = 'cloud'
+    }
+  })
+
   onMount(() => {
-    void editor.restoreAutosave()
-    const warn = (e: BeforeUnloadEvent) => editor.dirty && (e.preventDefault(), (e.returnValue = ''))
+    cloud.init()
+    const warn = (e: BeforeUnloadEvent) => cloud.atRisk && (e.preventDefault(), (e.returnValue = ''))
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   })
@@ -97,6 +109,12 @@
 
     <input class="title" value={editor.project.name} onchange={(e) => editor.setName(e.currentTarget.value)} aria-label="Project name" />
 
+    {#if cloud.secret}
+      <button class="sync {cloud.pill.tone}" onclick={() => (dialog = 'cloud')} aria-label="Library: {cloud.pill.text}" title="Open your Library">
+        <span class="dot"></span><span class="txt">{cloud.pill.text}</span>
+      </button>
+    {/if}
+
     <div class="hist">
       <button onclick={() => editor.undo()} disabled={!editor.canUndo} aria-label="Undo" title="Undo (Ctrl+Z)">↶</button>
       <button onclick={() => editor.redo()} disabled={!editor.canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)">↷</button>
@@ -108,7 +126,8 @@
         <div class="drop">
           <button onclick={() => ((dialog = 'new'), (menuOpen = false))}>New…</button>
           <button onclick={open}>Open…</button>
-          <button onclick={save}>Save{editor.dirty ? ' •' : ''}</button>
+          <button onclick={() => ((dialog = 'cloud'), (menuOpen = false))}>{cloud.secret ? 'My Library…' : 'Save to cloud…'}</button>
+          <button onclick={save}>Save to file{editor.dirty ? ' •' : ''}</button>
           <button onclick={() => ((dialog = 'resize'), (menuOpen = false))}>Resize canvas…</button>
           <button onclick={() => ((dialog = 'export'), (menuOpen = false))}>Export WebP…</button>
         </div>
@@ -137,7 +156,11 @@
   </div>
 
   {#if toast}<div class="toast" role="status">{toast}</div>{/if}
-  {#if dialog}<Dialogs kind={dialog} onclose={() => (dialog = null)} />{/if}
+  {#if dialog === 'cloud'}
+    <CloudDialog onclose={() => (dialog = null)} onnew={() => (dialog = 'new')} />
+  {:else if dialog}
+    <Dialogs kind={dialog} onclose={() => (dialog = null)} />
+  {/if}
 </div>
 
 <style>
@@ -190,6 +213,38 @@
   .title:hover,
   .title:focus {
     border-color: var(--border);
+  }
+  .sync {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 36px;
+    padding: 0 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .sync .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  .sync.ok .dot {
+    background: #56d364;
+  }
+  .sync.bad .dot {
+    background: #ff7b72;
+  }
+  .sync.bad {
+    border-color: #ff7b72;
+  }
+  @media (max-width: 700px) {
+    .sync .txt {
+      display: none;
+    }
+    .sync {
+      padding: 0 12px;
+    }
   }
   .hist {
     display: flex;

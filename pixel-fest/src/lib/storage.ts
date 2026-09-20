@@ -164,33 +164,3 @@ export function pickTextFile(): Promise<{ text: string; name: string } | null> {
     input.click()
   })
 }
-
-// --- Autosave (IndexedDB) ---------------------------------------------------
-
-const DB = 'pixelfest'
-const STORE = 'kv'
-
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB, 1)
-    req.onupgradeneeded = () => req.result.createObjectStore(STORE)
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
-  })
-}
-
-async function kv<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await openDb()
-  try {
-    return await new Promise<T>((resolve, reject) => {
-      const req = run(db.transaction(STORE, mode).objectStore(STORE))
-      req.onsuccess = () => resolve(req.result)
-      req.onerror = () => reject(req.error)
-    })
-  } finally {
-    db.close()
-  }
-}
-
-export const writeAutosave = (text: string) => kv('readwrite', (s) => s.put(text, 'autosave')).then(() => undefined)
-export const readAutosave = () => kv<string | undefined>('readonly', (s) => s.get('autosave'))
