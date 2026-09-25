@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/lag_follow.gd" id="1_lag_follow"]
+[ext_resource type="Texture2D" path="res://assets/sprites/rider.png" id="2_rider_tex"]
+
+[node name="Rider" type="Node2D"]
+script = ExtResource("1_lag_follow")
+follow_speed = 9.0
+extra_wobble_amplitude_deg = 2.0
+extra_wobble_speed = 5.3
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+position = Vector2(0, -14)
+texture = ExtResource("2_rider_tex")

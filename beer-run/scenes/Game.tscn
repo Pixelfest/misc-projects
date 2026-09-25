@@ -1,0 +1,109 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://scripts/game.gd" id="1_game_script"]
+[ext_resource type="PackedScene" path="res://scenes/Bike.tscn" id="2_bike_scene"]
+[ext_resource type="PackedScene" path="res://scenes/Rider.tscn" id="3_rider_scene"]
+[ext_resource type="PackedScene" path="res://scenes/Crate.tscn" id="4_crate_scene"]
+[ext_resource type="Texture2D" path="res://assets/sprites/road_tile.png" id="5_road_tex"]
+[ext_resource type="Script" path="res://scripts/road_scroll.gd" id="6_road_scroll_script"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ground"]
+size = Vector2(400, 20)
+
+[node name="Game" type="Node2D"]
+script = ExtResource("1_game_script")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0, 30)
+zoom = Vector2(3, 3)
+
+[node name="RoadScroll" type="Node2D" parent="."]
+position = Vector2(-192, 0)
+script = ExtResource("6_road_scroll_script")
+speed = 70.0
+tile_width = 64.0
+
+[node name="Tile0" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(0, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Tile1" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(64, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Tile2" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(128, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Tile3" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(192, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Tile4" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(256, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Tile5" type="Sprite2D" parent="RoadScroll"]
+position = Vector2(320, 60)
+centered = false
+texture = ExtResource("5_road_tex")
+
+[node name="Ground" type="StaticBody2D" parent="." groups=["ground"]]
+position = Vector2(0, 70)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ground"]
+shape = SubResource("RectangleShape2D_ground")
+
+[node name="Bike" parent="." instance=ExtResource("2_bike_scene")]
+position = Vector2(0, 40)
+
+[node name="Rider" parent="." instance=ExtResource("3_rider_scene")]
+
+[node name="Crate1" parent="." instance=ExtResource("4_crate_scene")]
+
+[node name="Crate2" parent="." instance=ExtResource("4_crate_scene")]
+
+[node name="Crate3" parent="." instance=ExtResource("4_crate_scene")]
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="CratesLabel" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 12.0
+offset_right = 260.0
+offset_bottom = 44.0
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+text = "Beer crates: 3 / 3"
+
+[node name="GameOverLabel" type="Label" parent="HUD"]
+visible = false
+offset_left = 230.0
+offset_top = 220.0
+offset_right = 730.0
+offset_bottom = 280.0
+theme_override_font_sizes/font_size = 42
+theme_override_colors/font_color = Color(1, 0.2, 0.2, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+horizontal_alignment = 1
+text = "GAME OVER"
+
+[node name="HintLabel" type="Label" parent="HUD"]
+offset_left = 16.0
+offset_top = 500.0
+offset_right = 944.0
+offset_bottom = 530.0
+theme_override_font_sizes/font_size = 16
+theme_override_colors/font_color = Color(1, 1, 1, 0.85)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 3
+horizontal_alignment = 1
+text = "SPACE: simulate hitting a bump (drop a crate)      R: restart after Game Over"

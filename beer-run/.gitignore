@@ -1,0 +1,16 @@
+# Godot 4 generated/local files
+.godot/
+.import/
+export.cfg
+export_credentials.cfg
+
+# Godot exported builds
+export/
+builds/
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
